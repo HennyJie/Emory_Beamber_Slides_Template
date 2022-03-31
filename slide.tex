@@ -1,0 +1,620 @@
+\documentclass{beamer}
+\usepackage{hyperref}
+\usepackage[T1]{fontenc}
+
+% other packages
+\usepackage{latexsym,amsmath,xcolor,multicol,booktabs,calligra}
+\usepackage{graphicx,pstricks,listings,stackengine}
+
+\author{Hejie Cui}
+\title{Scene Graph based Visual Retrieval}
+\subtitle{Paper Reading}
+\institute{Department of Computer Science, Emory University}
+\date{December 7, 2021}
+\usepackage{Tsinghua}
+
+% defs
+\def\cmd#1{\texttt{\color{red}\footnotesize $\backslash$#1}}
+\def\env#1{\texttt{\color{blue}\footnotesize #1}}
+\definecolor{deepblue}{rgb}{0,0,0.5}
+\definecolor{deepred}{rgb}{0.6,0,0}
+\definecolor{deepgreen}{rgb}{0,0.5,0}
+\definecolor{halfgray}{gray}{0.55}
+\definecolor{gold}{RGB}{242, 169, 0}
+
+\lstset{
+    basicstyle=\ttfamily\small,
+    keywordstyle=\bfseries\color{deepblue},
+    emphstyle=\ttfamily\color{deepred},    % Custom highlighting style
+    stringstyle=\color{deepgreen},
+    numbers=left,
+    numberstyle=\small\color{halfgray},
+    rulesepcolor=\color{red!20!green!20!blue!20},
+    frame=shadowbox,
+}
+
+
+\begin{document}
+
+% title page
+\begin{frame}
+    \titlepage
+    \begin{figure}[htpb]
+        \begin{center}
+            \includegraphics[width=0.4\linewidth]{pic/EU_shield_hz_280.pdf}
+        \end{center}
+    \end{figure}
+\end{frame}
+
+\begin{frame}
+    \tableofcontents[sectionstyle=show,subsectionstyle=show/shaded/hide,subsubsectionstyle=show/shaded/hide]
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% catalog 1: Image Retrieval
+% catalog 1-pg1
+\section{Image Retrieval}
+
+
+% catalog 1-pg2
+\subsection{(a) Paper 1: Image-to-Image Retrieval by Learning Similarity between Scene Graphs \cite{DBLP:conf/aaai/YoonKJLHPK21}}
+
+
+\begin{frame}{Image Retrieval with Scene Graph Similarity (IRSGS)}
+\begin{columns}
+    \begin{column}{0.5\linewidth}
+    \textbf{Background:}
+        \begin{itemize}
+            \item Image Retrieval: finding similar images to a query image from a database (visual search engines)
+            \item Existing work focus on image with a clear representative object
+            \item CNN based method focus on superficial and low-level features
+        \end{itemize}
+    \end{column}
+    
+    \begin{column}{0.5\linewidth}
+    \textbf{Challenges:} 
+        \begin{itemize}
+            \item no public available labeled data for complex image-to-image retrieval
+            \item need a similarity measure to reflect semantics of images, i.e., the context and relationship of entities in images
+        \end{itemize}
+    \end{column}
+
+\end{columns}
+\end{frame}
+
+
+\begin{frame}{Image Retrieval with Scene Graph Similarity (IRSGS)}
+\begin{columns}
+    \begin{column}{0.5\linewidth}
+    \textbf{Contributions:}
+        \begin{itemize}
+            \item Utilizes the similarity between scene graphs computed from a graph neural network to retrieve semantically similar images
+            \item Collect more that 10,000 human annotations over 1,700 image triplets to evaluate and publish
+            \item Train with the surrogate captions relevance obtained from a pre-trained language model (costly to collect enough gt for training)
+        \end{itemize}
+    \end{column}
+    
+    \begin{column}{0.5\linewidth}
+        \begin{figure}
+            \centering
+            \includegraphics[height=0.6\textheight]{pic/Retrieval/motivation.png}
+        \end{figure}
+    \end{column}
+\end{columns}
+\end{frame}
+
+
+\begin{frame}{Two-Step Retrieval using Visual Features}
+    \begin{itemize}
+        \item A common practice in information retrieval: retrieve roughly relevant items first and then re-rank the retrieved ones
+        \item Step 1 : For a query image, first retrieve $K=100$ images that are closest to the query in a ResNet-152 feature representation space formed by the 2048-dimension activation vector of the last hidden layer. The distance is measured in cosine similarity
+        \item Step 2: Perform IRSGS for re-ranking (focus of the paper)
+    \end{itemize}
+\end{frame}
+
+
+\begin{frame}{Overview of the Proposed Method}
+\begin{figure}[htpb]
+    \centering
+    \includegraphics[width=\linewidth]{pic/Retrieval/overview.png}
+\end{figure}
+\end{frame}
+
+
+\begin{frame}{Scene Graphs and Their Generation}
+\label{sgg}
+    \begin{itemize}
+        \item A scene graph $\mathcal{S}=\{\mathcal{O}, \mathcal{A}, \mathcal{R}\}$ of an image $\mathcal{I}$ is defined as a set of objects $\mathcal{O}$, attributes of objects $\mathcal{A}$, and relations on pairs of objects $\mathcal{R}$.
+        \item Treat all objects, attributes, and relations as nodes, and the associations among them as undirected edges.
+        \item \textbf{Scene Graph Generation}
+            \begin{itemize}
+                \item objects in image are detected by Faster R-CNN, and the name and attributes of the objects are predicted based on ResNet-101 features from the detected bounding boxes
+                \item for each pair of the detected objects, relations are predicted based on the frequency prior knowledge from the GQA dataset
+            \end{itemize}
+    \end{itemize}
+\end{frame}
+
+
+\begin{frame}{Retrieval via Scene Graph Similarity}
+    \begin{itemize}
+        \item Given a query image $\mathcal{I}_q$, an image retrieval system ranks candidate images $\{\mathcal{I}_i\}^N_{i=1}$ according to the similarity to the query image sim($\mathcal{I}_i$, $\mathcal{I}_q$).
+        \item Cast image retrieval into graph retrieval problem 
+        $$sim(\mathcal{I}_i, \mathcal{I}_j)=f(\mathcal{S}_i, \mathcal{S}_j)$$
+        \item The scene graph similarity is given as:
+        $$f\left(\mathcal{S}_{1}, \mathcal{S}_{2}\right)=\phi\left(\mathcal{S}_{1}\right)^{\top} \phi\left(\mathcal{S}_{2}\right),$$ where $\phi$ is constructed by computing the forward pass of GNNs (two versions: IRSGS-GCN and IRSGS-GIN) to obtain node representations and then apply average pooling.
+        
+    \end{itemize}
+\end{frame}
+
+
+\begin{frame}{Learning to Predict Surrogate Relevance}
+\textbf{Surrogate relevance measure}: let $c_i$ and $c_j$ are the captions of image $\mathcal{I}_i$ and $\mathcal{I}_j$. Apply Sentence-BERT to obtain representation vectors $\psi\left(c_{i}\right)$ and $\psi\left(c_{j}\right)$. The surrogate relevance measure is given by inner product:
+$$s(c_i, c_j)=\psi\left(c_{i}\right)^{\top} \psi\left(c_{j}\right)$$
+
+\textbf{Loss function}: train the scene graph similarity $f$ by directly minimizing mean square error from the surrogate relevance measure, formulating the learning as a regression problem: 
+$$L_{ij}=\left\|f\left(\mathcal{S}_{i}, \mathcal{S}_{j}\right)-s\left(c_{i}, c_{j}\right)\right\|^{2}$$
+\end{frame}
+
+
+\begin{frame}{Dataset}
+\textbf{VG-COCO:}
+    \begin{itemize}
+        \item each image has a scene graph annotation provided by Visual Genome and five captions provided by MS-COCO
+        \item 35,017 training images and 13,203 test images
+        \item query set: randomly select 1,000 images among the test set
+    \end{itemize}
+\textbf{Flickr30k:}
+    \begin{itemize}
+        \item five captions are provided per an image
+        \item self generated scene graphs
+        \item 30,000 training, 1000 validation and 1,000 testing (query set)
+    \end{itemize}
+\end{frame}
+
+
+\begin{frame}{Human Annotation Collection}
+% Collect semantic similarity annotations to validate the proposed surrogate relevance and the image retrieval method. 
+\textbf{Annotated Triplets Selection Criterion}: visually close yet semantically different image triplets: 
+    \begin{itemize}
+        \item Top 100 candidate images based on the cosine similarity in ResNet152 representation to the query image
+        \item The surrogate relevance of a query-candidate image pair in a triplet should be larger than the other (diff > 0.1)
+    \end{itemize}
+% either of the two candidate images is more similar than the other, images in the triplet are semantically identical, or neither of the candidate images is relevant to the query 
+
+\textbf{Human Agreement Score}
+Given a triplet, s1 (or s2 ) is the number of human annotators who chose the 1st (or the 2nd) candidate image is more semantically similar to the query, s3 be ... who answered that all three images are identical, and s4 be ... who marked the candidates as irrelevant
+\begin{equation*}
+\begin{tiny}
+\begin{aligned}
+\frac{s_{i}+0.5 s_{3}}{s_{1}+s_{2}+s_{3}+s_{4}},
+\end{aligned}
+\end{tiny}
+\end{equation*}
+where $i=1$ if the algorithm determines that the first image is semantically closer and $i=2$ otherwise
+\end{frame}
+
+
+
+
+\begin{frame}{Evaluation}
+The relevance of images ranked by the algorithm is evaluated with two metrics: 
+    \begin{itemize}
+        \item normalized discounted cumulative gain (nDCG) with the surrogate relevance as gain
+        \item the agreement between a retrieval algorithm and decision of human annotators
+    \end{itemize}
+\end{frame}
+
+
+\begin{frame}{Quantitative Results}
+Baselines: 
+    \begin{itemize}
+        \item Generated Caption
+        \item ResNet-152 Features and ResNet Finetune
+        \item Object Count (OC)
+        \item Graph Matching Networks (GMN)
+    \end{itemize}
+\begin{figure}[htpb]
+    \centering
+    \includegraphics[width=\linewidth]{pic/Retrieval/table1.png}
+\end{figure}
+\end{frame}
+
+\begin{frame}{Qualitative Results}
+\begin{itemize}
+    \item ResNet neglects the semantics and focuses on the superficial visual characteristics of images
+    \item OC only accounts for the presence of objects
+    \item IRSGS ontains images with similar objects with similar relations 
+\end{itemize}
+\begin{figure}[htpb]
+    \centering
+    \includegraphics[width=\linewidth]{pic/Retrieval/figure3.png}
+\end{figure}
+\end{frame}
+
+\begin{frame}{Ablation Study}
+From the IRSGS-GCN framework: 
+\begin{itemize}
+    \item Ignore Attributes
+    \item Randomize Relations
+\end{itemize}
+\begin{figure}[htpb]
+    \centering
+    \includegraphics[width=0.5\linewidth]{pic/Retrieval/table4.png}
+\end{figure}
+1. Both cases are better than OC that uses only object information.\\
+2. Relations are important for capturing the human perception of semantic similarity.
+\end{frame}
+
+
+\subsection{(b) Comments and Other Related Works}
+
+
+\begin{frame}
+\textbf{Comments}
+    \begin{itemize}
+        \item use only naive dot product for graph embedding similarity
+        \item the model to produce graph level embedding is simply GCN and GIN
+        \item based on only the semantics contained in the two single images, didn't include any external commonsense knowledge 
+    \end{itemize}
+    
+\textbf{Techniques from text-to-image retrieval}
+\begin{itemize}
+    \item first perform alignment between text and image, then construct a alignment graph and apply GNN \cite{DBLP:conf/aaai/DiaoZML21}
+    \item attention mechanism for filtration
+    \item utilize a global node \cite{DBLP:conf/iccv/PrabhuB15}
+    \item utilize an inference graph based on Bayesian Network to complete the entity attribute graph \cite{DBLP:conf/cvpr/XiongZWSW19}
+\end{itemize}
+
+\end{frame}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% catalog 2: Graph Matching
+% catalog 2-pg1
+\section{Graph Matching}
+
+
+% catalog 2-pg2
+\subsection{(a) Paper 2: Graph Matching Networks for Learning the Similarity of Graph Structured Objects \cite{DBLP:conf/icml/LiGDVK19}}
+
+
+\begin{frame}{Similarity Learning for Graph Structured Objects}
+\begin{columns}
+\begin{column}{0.5\linewidth}
+\textbf{Background:}
+    \begin{itemize}
+        \item How GNNs can be trained to produce embedding of graphs in vector spaces that enables efficient similarity reasoning
+        \item Applications: similarity based retrieval in graph database (Fig.1)
+        \item A successful model should
+        \begin{itemize}
+            \item exploit graph structure
+            \item reason about the similarity of graphs from learned semantics as well
+        \end{itemize}
+    \end{itemize}
+\end{column}
+
+\begin{column}{0.5\linewidth}
+    \begin{figure}
+        \centering
+        \includegraphics[height=0.8\textheight]{pic/GMN/gmn_fig1.png}
+    \end{figure}
+\end{column}
+\end{columns}
+\end{frame}
+
+
+\begin{frame}{Related Concepts for Graph Similarity Learning}
+\textbf{Graph kernels:}
+\begin{itemize}
+    \item Kernels on graphs designed to capture graph similarity, hand-designed and motivated by graph theory
+    \item Typically formulated as first computing the feature vectors for each graph (kernel embedding), and then take inner product to compute kernel value
+    \item Popular Graph Kernels
+    \begin{itemize}
+        \item kernels that measure the similarity between walks or paths
+        \item kernels based on limited-sized sub-structures
+        \item kernels based on sub-tree structures
+    \end{itemize}
+\end{itemize}
+\end{frame}
+
+
+\begin{frame}{Related Concepts for Graph Similarity Learning (Cont.)}
+\textbf{Distance metric learning:}
+\begin{itemize}
+    \item Early work: data already lies in a vector space and learn a metric matrix to properly measure the distance in this space to group similar examples together and dissimilar ones apart
+    \item Recently have been combined with applications such as face verification
+    \item Our focus: similarity metric learning for graphs
+\end{itemize}
+
+\textbf{Siamese networks:}
+\begin{itemize}
+    \item A family of NN for visual similarity learning
+    \item Two networks with shared parameters applied to two input images independently to compute representation and fuse them with a small network
+\end{itemize}
+\end{frame}
+
+
+\begin{frame}{Contributions}
+\begin{itemize}
+    \item Demonstrate how GNNs can be used to produce graph embeddings for similarity learning
+    \item Propose the new Graph Matching Networks (GMNs) that computes similarity through cross-graph attention-based matching
+    \item The proposed models outperform structure agnostic models and established hand-engineered baselines
+\end{itemize}
+\end{frame}
+
+
+\begin{frame}{Graph Embedding Models v.s. Graph Matching Networks}
+Graph embedding models
+\begin{itemize}
+\item embed each graph independently into a vector and then all the similarity computation happens in the vector space
+\end{itemize}
+
+Graph matching networks
+\begin{itemize}
+\item instead of computing graph representations independently for each graph, the GMNs compute a similarity score through a cross-graph attention mechanism to associate nodes across graphs and identify differences
+\end{itemize}
+
+\begin{figure}[h]
+\centering
+\includegraphics[height=0.4\textheight]{pic/GMN/gmn_fig2.png}
+\end{figure}
+\end{frame}
+
+
+\begin{frame}{Graph Embedding Models}
+\textbf{Encoder}
+\begin{equation*}
+\begin{tiny}
+\begin{aligned}
+\mathbf{h}_{i}^{(0)}=& \operatorname{MLP}_{\text {node }}\left(\mathbf{x}_{i}\right), \quad \forall i \in V \\
+\mathbf{e}_{i j}=& \operatorname{MLP}_{\text {edge }}\left(\mathbf{x}_{i j}\right), \quad \forall(i, j) \in E
+\end{aligned}
+\end{tiny}
+\end{equation*}
+
+\textbf{Propagation Layers}
+map a set of node representations $\left\{\mathbf{h}_{i}^{(t)}\right\}_{i \in V}$ to new node representations $\left\{\mathbf{h}_{i}^{(t+1)}\right\}_{i \in V}$
+\begin{equation*}
+\begin{tiny}
+\begin{aligned}
+\mathbf{m}_{j \rightarrow i} &=f_{\text {message }}\left(\mathbf{h}_{i}^{(t)}, \mathbf{h}_{j}^{(t)}, \mathbf{e}_{i j}\right) \\
+\mathbf{h}_{i}^{(t+1)} &=f_{\text {node }}\left(\mathbf{h}_{i}^{(t)}, \sum_{j:(j, i) \in E} \mathbf{m}_{j \rightarrow i}\right)
+\end{aligned}
+\end{tiny}
+\end{equation*}
+
+\textbf{Aggregator}
+take the set of node representations $\left\{\mathbf{h}_{i}^{(T)}\right\}$ of $T$ rounds of propagations as input, and compute a graph level representation $\mathbf{h}_{G}=f_{G}\left(\left\{\mathbf{h}_{i}^{(T)}\right\}\right)$
+\begin{equation*}
+\begin{tiny}
+\begin{aligned}
+\mathbf{h}_{G}=\operatorname{MLP}_{G}\left(\sum_{i \in V} \sigma\left(\operatorname{MLP}_{\text {gate }}\left(\mathbf{h}_{i}^{(T)}\right)\right) \odot \operatorname{MLP}\left(\mathbf{h}_{i}^{(T)}\right)\right)
+\end{aligned}
+\end{tiny}
+\end{equation*}
+\end{frame}
+
+
+\begin{frame}{Graph Matching Networks}
+
+\textbf{Propagation Layers}
+The main difference lays in the propagation layer: utilize a cross-graph matching vector to measure how well a node in one graph can be matched to one or more nodes in the other (independent $\rightarrow$ jointly) \\
+
+\begin{tiny}
+\begin{equation*}
+\begin{aligned}
+\mathbf{m}_{j \rightarrow i}=& f_{\text {message }}\left(\mathbf{h}_{i}^{(t)}, \mathbf{h}_{j}^{(t)}, \mathbf{e}_{i j}\right), \forall(i, j) \in E_{1} \cup E_{2} \\
+\boldsymbol{\mu}_{j \rightarrow i}=& f_{\text {match }}\left(\mathbf{h}_{i}^{(t)}, \mathbf{h}_{j}^{(t)}\right) \\
+& \forall i \in V_{1}, j \in V_{2}, \text { or } i \in V_{2}, j \in V_{1} \\
+\mathbf{h}_{i}^{(t+1)}=& f_{\text {node }}\left(\mathbf{h}_{i}^{(t)}, \sum_{j} \mathbf{m}_{j \rightarrow i}, \sum_{j^{\prime}} \boldsymbol{\mu}_{j^{\prime} \rightarrow i}\right) \\
+\mathbf{h}_{G_{1}}=& f_{G}\left(\left\{\mathbf{h}_{i}^{(T)}\right\}_{i \in V_{1}}\right) \\
+\mathbf{h}_{G_{2}}=& f_{G}\left(\left\{\mathbf{h}_{i}^{(T)}\right\}_{i \in V_{2}}\right) \\
+s=& f_{s}\left(\mathbf{h}_{G_{1}}, \mathbf{h}_{G_{2}}\right)
+\end{aligned}
+\end{equation*}
+\end{tiny}
+\end{frame}
+
+\begin{frame}{Graph Matching Networks (Cont.)}
+$f_{s}$ is a standard vector space similarity between $\mathbf{h}_{G_{1}}$ and $\mathbf{h}_{G_{2}}$. 
+$f_{\text {match }}$ is a function that communicates cross graph information, which the paper propose to use an attention based module:
+\begin{tiny}
+\begin{equation}
+\begin{aligned}
+a_{j \rightarrow i} &=\frac{\exp \left(s_{h}\left(\mathbf{h}_{i}^{(t)}, \mathbf{h}_{j}^{(t)}\right)\right)}{\sum_{j^{\prime}} \exp \left(s_{h}\left(\mathbf{h}_{i}^{(t)}, \mathbf{h}_{j^{\prime}}^{(t)}\right)\right)} \\
+\boldsymbol{\mu}_{j \rightarrow i} &=a_{j \rightarrow i}\left(\mathbf{h}_{i}^{(t)}-\mathbf{h}_{j}^{(t)}\right)
+\end{aligned}
+\end{equation}
+\end{tiny}
+and therefore,
+\begin{tiny}
+\begin{equation}
+\sum_{j} \boldsymbol{\mu}_{j \rightarrow i}=\sum_{j} a_{j \rightarrow i}\left(\mathbf{h}_{i}^{(t)}-\mathbf{h}_{j}^{(t)}\right)=\mathbf{h}_{i}^{(t)}-\sum_{j} a_{j \rightarrow i} \mathbf{h}_{j}^{(t)}
+\end{equation}
+\end{tiny}
+$s_{h}$ is a vector space similarity metric like Euclidean or cosine similarity. $a_{j \rightarrow i}$ are the attention weights. $\sum_{j} \boldsymbol{\mu}_{j \rightarrow i}$ intuitively measures the difference between $\mathbf{h}_{i}^{(t)}$ and its closest neighbor in the other graph. 
+\end{frame}
+
+\begin{frame}{Learning}
+Margin-based pairwise loss:
+\begin{itemize}
+    \item train on pairs $(G_1, G_2)$
+\end{itemize}
+$$
+L_{\text {pair }}=\mathbb{E}_{\left(G_{1}, G_{2}, t\right)}\left[\max \left\{0, \gamma-t\left(1-d\left(G_{1}, G_{2}\right)\right)\right\}\right]
+$$
+
+Margin-based triplet loss:
+\begin{itemize}
+    \item train on triplets $(G_1, G_2, G_3)$
+\end{itemize}
+$$
+L_{\text {triplet }}=\mathbb{E}_{\left(G_{1}, G_{2}, G_{3}\right)}\left[\max \left\{0, d\left(G_{1}, G_{2}\right)-d\left(G_{1}, G_{3}\right)+\gamma\right\}\right]
+$$
+\end{frame}
+
+
+\begin{frame}{Exp1: Synthetic Graph Edit Distances Learning}
+\textbf{Problem Background}
+\begin{itemize}
+    \item graph edit distance between graphs $G_1$ and $G_2$ is defined as the min num of edit operations needed to transform $G_1$ to $G_2$
+    \item NP-hard in general, therefore approximations have to be used
+\end{itemize}
+\textbf{Training Setup}
+\begin{itemize}
+    \item generated training data by sampling random binomial graphs $G_{1}$ with $n$ nodes and edge probability $p$
+    \item create positive example $G_{2}$ by randomly substituting $k_{p}$ edges from $G_{1}$ with new edges, and negative example $G_{3}$ by substituting $k_{n}$ edges from $G_{1}$, where $k_{p}<k_{n}$
+    \item a model needs to predict a higher similarity score for positive pair $\left(G_{1}, G_{2}\right)$ than negative pair $\left(G_{1}, G_{3}\right)$
+\end{itemize}
+\end{frame}
+
+
+\begin{frame}{Exp1: Synthetic Graph Edit Distances Learning (Cont.)}
+\textbf{Results}
+\begin{figure}[h]
+\centering
+\includegraphics[height=0.3\textheight]{pic/GMN/gmn_table1.png}
+\end{figure}
+\begin{figure}[h]
+\centering
+\includegraphics[height=0.4\textheight]{pic/GMN/gmn_fig3.png}
+\end{figure}
+\end{frame}
+
+
+\begin{frame}{Exp2: Control Flow Graph based Binary Function Similarity Search}
+\textbf{Problem Background}
+\begin{itemize}
+    \item Control Flow Graph (CFG) contains all the information in a binary function in a structured format
+    \item CFGs for the same function have high similarity and low similarity otherwise
+\end{itemize}
+
+\textbf{Training Setup and Baseline}
+\begin{itemize}
+    \item vulnerability search: given a binary known to have some vulnerabilities as query, search through a library to find similar binaries that may have the same vulnerabilities
+    \item baselines: Google's open source function similarity search tool (hand-engineered graph hashing process)
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Exp2: CFG based Binary Function Similarity Search (Cont.)}
+\textbf{Results}
+\begin{itemize}
+    \item metrics: pair AUC and triplet accuracy
+\end{itemize}
+\begin{figure}[h]
+\centering
+\includegraphics[height=0.4\textheight]{pic/GMN/gmn_fig4.png}
+\end{figure}
+\end{frame}
+
+\begin{frame}{Exp3: More Baselines and Ablation Studies}
+\textbf{More Baselines}
+\begin{itemize}
+    \item Graph Convolutional Network (GCN) model
+    \item Siamese versions of the GNN/GCN embedding models
+\end{itemize}
+\textbf{Extra Dataset}
+\begin{itemize}
+    \item COIL-DEL mesh graph dataset
+    \item mesh retrieval
+\end{itemize}
+\begin{figure}[h]
+\centering
+\includegraphics[height=0.4\textheight]{pic/GMN/gmn_table2.png}
+\end{figure}
+\end{frame}
+
+
+\begin{frame}{Conclusion}
+\textbf{Strength:}
+The added power for the graph matching models comes from the fact that they are not independently mapping each graph to an embedding, but rather doing comparisons at all levels across the pair of graphs \\
+
+\textbf{Shortness:}
+\begin{itemize}
+    \item each cross-graph matching step requires the computation of the full attention matrices, which requires at least $O(|V1||V2|)$ time, this may be expensive for large graphs
+    \item the matching models operate on pairs, and cannot directly be used for indexing and searching through large graph databases
+\end{itemize}
+\end{frame}
+
+
+\subsection{(b) Comments and Other Related Works}
+\begin{frame}{Comments}
+\begin{itemize}
+    \item cross graph attention is helpful for graph matching since it provides more fine-grained matching 
+    \item more efficient cross-graph attention mechanisms are needed for graph matching, e.g. sparse connection
+    \item for scene graph matching in image retrieval, edge (relation) attributes and frequency can be further considered
+    \item the understanding of GNN's discriminative power (isomorphism test): as powerful as the Weisfeiler-Lehman algorithm in terms of distinguishing graphs
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Other Related Works}
+% \textbf{Other Related Works}
+%     \begin{itemize}
+%         \item current graph matching is mainly studied in computer vision application such as image correspondence, image key point matching
+%         \item 
+%         \item 
+%     \end{itemize}
+% \end{frame}
+
+\begin{columns}
+\begin{column}{0.5\linewidth}
+
+\begin{itemize}
+    \item current graph matching is mainly studied in computer vision application such as image correspondence, image key point matching
+    \item combinatorial optimization, e.g. combinatorial embedding networks \cite{DBLP:conf/iccv/WangYY19}
+    \item deep parametric feature hierarchies \cite{DBLP:conf/cvpr/ZanfirS18}
+\end{itemize}
+\end{column}
+
+\begin{column}{0.5\linewidth}
+    \begin{figure}
+        \centering
+        \includegraphics[height=0.4\textheight]{pic/GMN/image_correspondence.png}
+    \end{figure}
+    \begin{figure}
+        \centering
+        \includegraphics[height=0.25\textheight]{pic/GMN/molecules.png}
+    \end{figure}
+\end{column}
+\end{columns}
+\end{frame}
+
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% % catalog 3: Video Retrieval
+% % catalog 3-pg1
+% \section{Video Retrieval}
+
+
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% % catalog 4: Comments
+% % catalog 4-pg1
+% \section{Comments}
+% % catalog 4-pg2
+% \begin{frame}
+%     \begin{itemize}
+%         \item Utilize global knowledge graph for reasoning
+%         \item More efficient cross-graph attention mechanisms are needed for graph matching
+%         \item 
+%         \item 
+%     \end{itemize}
+% \end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% catalog 5: Reference
+% catalog 5-pg1
+\section{Reference}
+
+% catalog 5-pg2
+\begin{frame}[allowframebreaks]
+    \bibliography{ref}
+    % \bibliographystyle{alpha}
+    % 如果参考文献太多的话，可以像下面这样调整字体：
+    \tiny \bibliographystyle{alpha}
+\end{frame}
+
+% catalog 5-pg3
+\begin{frame}
+    \begin{center}
+        {\Huge\calligra Thanks!}
+    \end{center}
+\end{frame}
+
+\end{document}
